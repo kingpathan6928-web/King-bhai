@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INFHUB_SALMAN | OmniStore</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root { --accent: #9c27b0; --bg: #0b0b0b; --card: #151515; --blue: #007bff; --white: #ffffff; }
+        * { font-weight: 900 !important; font-family: 'Segoe UI', sans-serif; box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--white); padding-bottom: 110px; overflow-x: hidden; }
+        .hidden { display: none !important; }
+
+        .user-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .search-box { padding: 0 20px 15px; }
+        .search-input { width: 100%; padding: 12px 20px; background: #1a1a1a; border: 1px solid #333; border-radius: 15px; color: white; outline: none; }
+
+        .banner { margin: 0 20px; padding: 30px; background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); border-radius: 30px; }
+        .banner h1 { margin: 10px 0 5px; font-size: 28px; text-transform: uppercase; }
+
+        .cat-scroll { display: flex; gap: 15px; overflow-x: auto; padding: 0 20px; scrollbar-width: none; }
+        .cat-card { min-width: 90px; background: var(--card); padding: 20px 10px; border-radius: 25px; text-align: center; border: 1px solid #222; }
+
+        .trend-card { margin: 10px 20px; background: var(--card); border-radius: 25px; padding: 18px; display: flex; align-items: center; border: 1.2px solid #222; }
+        .app-icon { width: 60px; height: 60px; border-radius: 15px; object-fit: cover; }
+        .btn-get { background: #1a1a1a; border: none; color: var(--blue); padding: 8px 20px; border-radius: 20px; cursor: pointer; }
+
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 5000; padding: 25px; overflow-y: auto; }
+        .close-btn { font-size: 35px; margin-bottom: 20px; cursor: pointer; }
+        .input-f { width: 100%; padding: 15px; background: #111; border: 1px solid #333; color: white; border-radius: 12px; margin-bottom: 10px; }
+
+        /* IMAGE VIEWER STYLE */
+        #img-viewer { z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.95); }
+        #img-viewer img { max-width: 90%; max-height: 80%; border-radius: 10px; border: 2px solid #333; }
+
+        nav { position: fixed; bottom: 0; width: 100%; background: rgba(0,0,0,0.9); display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid #222; backdrop-filter: blur(10px); z-index: 1000; }
+    </style>
+</head>
+<body>
+
+    <div id="home-screen">
+        <div id="home-header" class="user-header">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:40px; height:40px; background:#333; border-radius:50%; display:flex; align-items:center; justify-content:center;">GU</div>
+                <div><small style="color:#666;">Hello,</small><br>Guest</div>
+            </div>
+            <div style="color:var(--blue); font-size:22px;">➲</div>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="search-bar" class="search-input" placeholder="🔍 Search apps..." oninput="doSearch()">
+        </div>
+
+        <div id="main-ui">
+            <div class="banner">
+                <span style="font-size:10px; background:rgba(255,255,255,0.2); padding:5px 12px; border-radius:15px;">✨ FEATURED</span>
+                <h1><b>INFHUB_SALMAN</b></h1>
+                <p>Download APK & Games Hub...</p>
+            </div>
+            <div style="padding:20px 20px 5px;"><h2>Categories</h2></div>
+            <div class="cat-scroll">
+                <div class="cat-card">🎮 Adventure</div><div class="cat-card">🕹️ Arcade</div><div class="cat-card">♟️ Board</div><div class="cat-card">🛡️ Action</div>
+            </div>
+            <div style="padding:20px 20px 5px;"><h2>🔥 Trending Now</h2></div>
+            <div id="trending-area"></div>
+        </div>
+
+        <div id="search-res-title" class="hidden" style="padding:10px 20px;"><h2>Results</h2></div>
+        <div id="grid-area" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; padding:20px;"></div>
+    </div>
+
+    <div id="img-viewer" class="overlay hidden" onclick="this.classList.add('hidden')">
+        <div class="close-btn" style="position: absolute; top: 20px; right: 30px;">✕</div>
+        <img id="viewer-src" src="">
+    </div>
+
+    <div id="login-page" class="overlay hidden">
+        <div class="close-btn" onclick="closeOverlay('login-page')">✕</div>
+        <div style="background:#111; padding:30px; border-radius:30px; border:1px solid #333; margin-top:50px;">
+            <h2 style="text-align:center;">Login</h2>
+            <input type="email" class="input-f" placeholder="Email">
+            <input type="password" class="input-f" placeholder="Password">
+            <button style="background:var(--blue); width:100%; padding:16px; border:none; color:white; border-radius:15px;">Sign In</button>
+        </div>
+    </div>
+
+    <div id="detail-page" class="overlay hidden">
+        <div class="close-btn" onclick="closeOverlay('detail-page')">✕</div>
+        <center>
+            <img id="d-icon" class="app-icon" style="width:100px; height:100px;">
+            <h1 id="d-name">App Name</h1>
+            <button id="install-btn" style="background:var(--accent); color:white; border:none; padding:15px 50px; border-radius:30px;">Install</button>
+            <div style="margin:20px 0; display:flex; justify-content:space-around; border-top:1px solid #222; padding-top:15px;">
+                <div><span id="d-count" style="color:var(--blue); font-size:18px;">0</span><br><small>Downloads</small></div>
+                <div><span style="color:#ffcc00; font-size:18px;">4.9 ★</span><br><small>Rating</small></div>
+            </div>
+        </center>
+        <h3>Inside Views (Tap to zoom)</h3>
+        <div id="d-screens" style="display:flex; gap:10px; overflow-x:auto;"></div>
+        <h3>Comments</h3>
+        <div id="c-list"></div>
+        <input type="text" id="c-msg" class="input-f" placeholder="Comment...">
+        <button onclick="addComment()" style="background:var(--blue); width:100%; padding:10px; border:none; color:white; border-radius:10px;">Post</button>
+    </div>
+
+    <div id="admin-page" class="overlay hidden">
+        <div class="close-btn" onclick="closeOverlay('admin-page')">✕</div>
+        <center><h2>Admin Panel</h2></center>
+        <input type="password" id="key" class="input-f" placeholder="Key (salman786)">
+        <input type="text" id="name" class="input-f" placeholder="App Name">
+        <input type="text" id="link" class="input-f" placeholder="Download URL">
+        <input type="text" id="icon" class="input-f" placeholder="Icon URL">
+        <input type="text" id="s1" class="input-f" placeholder="Screen 1"><input type="text" id="s2" class="input-f" placeholder="Screen 2">
+        <input type="text" id="s3" class="input-f" placeholder="Screen 3"><input type="text" id="s4" class="input-f" placeholder="Screen 4">
+        <button onclick="saveApp()" style="background:var(--accent); width:100%; padding:15px; border:none; color:white; border-radius:30px;">Upload App</button>
+    </div>
+
+    <nav id="bottom-nav">
+        <div onclick="location.reload()">🏠<br><small>Home</small></div>
+        <div onclick="openOverlay('login-page')">🪟<br><small>Login</small></div>
+        <div onclick="document.getElementById('search-bar').focus()">🔍<br><small>Search</small></div>
+        <div onclick="openOverlay('admin-page')">☰<br><small>Menu</small></div>
+    </nav>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBN09E0DOWObObiZJdEoZGCT-KR8KSg7s8",
+            authDomain: "info-hub-salman.firebaseapp.com",
+            projectId: "info-hub-salman",
+            storageBucket: "info-hub-salman.firebasestorage.app",
+            messagingSenderId: "556347254656",
+            appId: "1:556347254656:web:b51c7b55a0bc24ca6dc365"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let allApps = [];
+        let activeId = ""; let activeLink = "";
+
+        db.collection("all_apps").orderBy("time", "desc").onSnapshot(snap => {
+            allApps = [];
+            snap.forEach(doc => allApps.push({id: doc.id, ...doc.data()}));
+            render(allApps);
+        });
+
+        function render(data) {
+            const tArea = document.getElementById('trending-area');
+            const gArea = document.getElementById('grid-area');
+            tArea.innerHTML = ""; gArea.innerHTML = "";
+            data.forEach((app, i) => {
+                const card = `<div style="background:var(--card); padding:15px; border-radius:20px; text-align:center;" onclick="viewApp('${app.id}')">
+                    <img src="${app.icon || 'https://via.placeholder.com/60'}" class="app-icon" style="margin-bottom:10px;">
+                    <div style="font-size:14px; overflow:hidden;">${app.name}</div>
+                    <button class="btn-get" style="width:100%; margin-top:10px;">GET</button>
+                </div>`;
+                if(i === 0 && document.getElementById('search-bar').value === "") {
+                    tArea.innerHTML = `<div class="trend-card" onclick="viewApp('${app.id}')">
+                        <img src="${app.icon || 'https://via.placeholder.com/60'}" class="app-icon">
+                        <div style="flex:1; margin-left:15px;"><b>${app.name}</b><br><small style="color:#555;">${app.downloads || 0} DLs</small></div>
+                        <button class="btn-get">GET</button>
+                    </div>`;
+                }
+                gArea.innerHTML += card;
+            });
+        }
+
+        function doSearch() {
+            const q = document.getElementById('search-bar').value.toLowerCase();
+            const main = document.getElementById('main-ui'), resTitle = document.getElementById('search-res-title'), header = document.getElementById('home-header'), nav = document.getElementById('bottom-nav');
+            if(q !== "") { [main, header, nav].forEach(el => el.classList.add('hidden')); resTitle.classList.remove('hidden'); render(allApps.filter(a => a.name.toLowerCase().includes(q))); }
+            else { [main, header, nav].forEach(el => el.classList.remove('hidden')); resTitle.classList.add('hidden'); render(allApps); }
+        }
+
+        // IMAGE ZOOM FUNCTION
+        function zoomImg(url) {
+            document.getElementById('viewer-src').src = url;
+            document.getElementById('img-viewer').classList.remove('hidden');
+        }
+
+        function viewApp(id) {
+            activeId = id; const app = allApps.find(a => a.id === id); activeLink = app.link;
+            document.getElementById('detail-page').classList.remove('hidden');
+            document.getElementById('d-name').innerText = app.name;
+            document.getElementById('d-icon').src = app.icon || 'https://via.placeholder.com/100';
+            document.getElementById('d-count').innerText = app.downloads || 0;
+            const sArea = document.getElementById('d-screens'); sArea.innerHTML = "";
+            [app.s1, app.s2, app.s3, app.s4].forEach(s => { 
+                if(s) sArea.innerHTML += `<img src="${s}" style="height:180px; border-radius:10px;" onclick="zoomImg('${s}')">`; 
+            });
+            loadComments(id);
+        }
+
+        document.getElementById('install-btn').onclick = function() {
+            db.collection("all_apps").doc(activeId).update({ downloads: firebase.firestore.FieldValue.increment(1) })
+            .then(() => { window.location.href = activeLink; });
+        };
+
+        function addComment() {
+            const m = document.getElementById('c-msg').value;
+            if(m) { db.collection("all_apps").doc(activeId).collection("comments").add({ msg: m, time: Date.now() }).then(() => { document.getElementById('c-msg').value = ""; }); }
+        }
+
+        function loadComments(id) {
+            db.collection("all_apps").doc(id).collection("comments").orderBy("time", "desc").onSnapshot(snap => {
+                const list = document.getElementById('c-list'); list.innerHTML = "";
+                snap.forEach(doc => { list.innerHTML += `<div style="background:#111; padding:8px; border-radius:8px; margin-bottom:5px;"><small>${doc.data().msg}</small></div>`; });
+            });
+        }
+
+        function saveApp() {
+            if(document.getElementById('key').value !== "salman786") return alert("Wrong Key");
+            db.collection("all_apps").add({
+                name: document.getElementById('name').value, link: document.getElementById('link').value, icon: document.getElementById('icon').value,
+                s1: document.getElementById('s1').value, s2: document.getElementById('s2').value, s3: document.getElementById('s3').value, s4: document.getElementById('s4').value,
+                downloads: 0, time: Date.now()
+            }).then(() => { alert("Success!"); closeOverlay('admin-page'); });
+        }
+
+        function closeOverlay(id) { document.getElementById(id).classList.add('hidden'); }
+        function openOverlay(id) { document.getElementById(id).classList.remove('hidden'); }
+    </script>
+</body>
+</html>
