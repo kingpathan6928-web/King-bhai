@@ -152,3 +152,4 @@ bot.onText(/\/start/, async (msg) => {
     if (!userData) await User.create({ userId, firstName: msg.from.first_name });
     showMainMenu(msg.chat.id, userId, msg.from.first_name);
 });
+                                    
