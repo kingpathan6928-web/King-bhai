@@ -1,0 +1,155 @@
+const TelegramBot = require('node-telegram-bot-api');
+const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
+
+// 1. ⚙️ CONFIGURATION
+const token = '8457765007:AAFKi6MdkSQTnXfy2DLvBib77mrrk8MrgPI'; 
+const bot = new TelegramBot(token, {polling: true});
+const ADMIN_ID = '8291716115'; // Salman Khan ID
+const GROUP_USERNAME = '@infohub_salman'; // Aapka Group
+const GROUP_LINK = 'https://t.me/infohub_salman';
+
+const CYBER_PHOTO = 'https://i.postimg.cc/QMXkvP3h/IMG-20260125-135130-611.webp';
+const SCANNER_PHOTO = 'https://i.postimg.cc/D0K0mScG/Account-QRCode-India-Post-Payment-Bank-6316-DARK-THEME.png';
+
+// ✅ 8 GMAIL ACCOUNTS
+const myAccounts = [
+    { user: 'salmanbhai56905@gmail.com', pass: 'mmhbfoqenuifunsn' },
+    { user: 'kkkk00788@gmail.com', pass: 'izowjgfrpookslqt' },
+    { user: 'khansalman32718@gmail.com', pass: 'gubxndwakafdnuzb' },
+    { user: 'salmank04425@gmail.com', pass: 'jxoqphrjwlixdzyb' },
+    { user: 'sksksk79p@gmail.com', pass: 'syagqzipnexkfpwf' },
+    { user: 'opopop11ks@gmail.com', pass: 'gsodfmmhouapzkwp' },
+    { user: 'klklkl33p@gmail.com', pass: 'plxagkwmjtdacfho' },
+    { user: 'ramnjanalam@gmail.com', pass: 'gnihyjobovkqvwib' }
+];
+
+// 2. 🗄️ DATABASE
+const mongoURI = 'mongodb+srv://kingpathan6928_db_user:UyDOGbgVWR7IvcaT@cluster0.3eu2uug.mongodb.net/SalChat?retryWrites=true&appName=Cluster0';
+mongoose.connect(mongoURI);
+
+const userSchema = new mongoose.Schema({
+    userId: String,
+    firstName: String,
+    tokens: { type: Number, default: 0 },
+    totalUnbans: { type: Number, default: 0 }
+});
+const User = mongoose.model('User', userSchema);
+let userState = new Map();
+
+// 3. 🛡️ ADMIN COMMAND: TOKENS DENE KE LIYE
+// Command: /add [UserId] [Amount]
+bot.onText(/\/add (\d+) (\d+)/, async (msg, match) => {
+    if (msg.from.id.toString() !== ADMIN_ID) return;
+    
+    const targetId = match[1];
+    const amount = parseInt(match[2]);
+
+    await User.findOneAndUpdate({ userId: targetId }, { $inc: { tokens: amount } });
+    bot.sendMessage(msg.chat.id, `✅ Done! User <code>${targetId}</code> ko <b>${amount}</b> tokens de diye gaye hain.`, { parse_mode: 'HTML' });
+    bot.sendMessage(targetId, `🎉 <b>Admin ne aapko ${amount} tokens bheje hain!</b>`, { parse_mode: 'HTML' });
+});
+
+// 4. 🚀 MAIN MENU WITH GROUP LINK
+async function showMainMenu(chatId, userId, firstName) {
+    const user = await User.findOne({ userId: userId.toString() });
+    const text = `💹 <b>WhatsApp Unban Pro v3.0</b> 💹\n━━━━━━━━━━━━━━━━━━\n\n👤 <b>User:</b> ${firstName} [FREE]\n🆔 <b>ID:</b> <code>${userId}</code>\n\n📈 <b>Statistics:</b>\n🎯 <b>Total Unbans:</b> ${user.totalUnbans + 924}\n✅ <b>Successful:</b> ${user.totalUnbans + 921}\n🏆 <b>Success Rate:</b> 99.7%\n\n🕒 <b>Today:</b> 0/2 attempts\n⚡ <b>Methods:</b> 7 available\n\n🔗 <b>Referral:</b> SALLU${userId.slice(-4)}`;
+
+    bot.sendPhoto(chatId, CYBER_PHOTO, {
+        caption: text,
+        parse_mode: 'HTML',
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '🟢 WhatsApp Unban (Normal Blue)', callback_data: 'start_mission' }],
+                [{ text: '📁 History', callback_data: 'view_history' }, { text: '👤 Account', callback_data: 'view_account' }],
+                [{ text: '👑 Premium (Scanner)', callback_data: 'view_premium' }, { text: '🎁 Redeem', callback_data: 'redeem_fake' }],
+                [{ text: '💬 Join Group', url: GROUP_LINK }] // Fixed Group Link
+            ]
+        }
+    });
+}
+
+// 5. CALLBACK HANDLERS
+bot.on('callback_query', async (query) => {
+    const chatId = query.message.chat.id;
+    const userId = query.from.id.toString();
+
+    if (query.data === 'view_premium') {
+        bot.sendPhoto(chatId, SCANNER_PHOTO, {
+            caption: `💳 <b>PAYMENT SCANNER</b>\n\nScanner par pay karke screenshot group par bhejein auto tokens ke liye.\n\n<b>Admin ID:</b> <code>${ADMIN_ID}</code>\n<b>Group:</b> ${GROUP_USERNAME}`,
+            parse_mode: 'HTML'
+        });
+    }
+
+    if (query.data === 'start_mission') {
+        userState.set(chatId, { step: 'awaiting_platform' });
+        bot.sendMessage(chatId, "📱 <b>Select Device Platform:</b>", {
+            reply_markup: { inline_keyboard: [[{ text: 'Android', callback_data: 'plat_android' }, { text: 'iPhone', callback_data: 'plat_ios' }]] },
+            parse_mode: 'HTML'
+        });
+    }
+
+    if (query.data.startsWith('plat_')) {
+        const plat = query.data.split('_')[1];
+        userState.set(chatId, { step: 'awaiting_number', platform: plat });
+        bot.sendMessage(chatId, `🚀 <b>[${plat.toUpperCase()}]</b> Number bhejein (91...):`);
+    }
+
+    if (query.data === 'view_account') {
+        const user = await User.findOne({ userId });
+        bot.sendMessage(chatId, `👤 <b>ACCOUNT</b>\n\n💰 <b>Token Balance:</b> ${user.tokens}\n🌟 <b>Status:</b> Aapne abhi tak premium features buy nahi kiya hai.`, { parse_mode: 'HTML' });
+    }
+});
+
+// 6. 🚀 PROCESSING & MAILING
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    const text = msg.text;
+
+    if (!text || text.startsWith('/')) return;
+
+    if (/^\d{10,13}$/.test(text)) {
+        let user = await User.findOne({ userId });
+        
+        if (!user || user.tokens <= 0) {
+            return bot.sendMessage(chatId, "❌ <b>Insufficient Tokens!</b> Premium par click karke QR scan karein.", { parse_mode: 'HTML' });
+        }
+
+        const state = userState.get(chatId);
+        const platform = state?.platform || 'android';
+
+        await User.findOneAndUpdate({ userId }, { $inc: { tokens: -1, totalUnbans: 1 } });
+        
+        const statusMsg = await bot.sendMessage(chatId, `⏳ <b>Mission Started for +${text}</b>\nProcessing via 8 Premium Accounts...`, { parse_mode: 'HTML' });
+
+        myAccounts.forEach((acc, index) => {
+            setTimeout(async () => {
+                let transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: acc.user, pass: acc.pass } });
+                const targetEmail = platform === 'android' ? 'android_web@support.whatsapp.com' : 'iphone_web@support.whatsapp.com';
+                
+                transporter.sendMail({
+                    from: acc.user,
+                    to: targetEmail,
+                    subject: `Unban Request - +${text}`,
+                    text: `Restore my WhatsApp number +${text}. I follow all rules.`
+                });
+
+                await bot.editMessageText(`⏳ <b>Appeal in progress...</b>\n\n✅ [${index + 1}/8] Sent from:\n📧 <code>${acc.user}</code>`, {
+                    chat_id: chatId,
+                    message_id: statusMsg.message_id,
+                    parse_mode: 'HTML'
+                });
+            }, index * 10000); 
+        });
+        userState.delete(chatId);
+    }
+});
+
+bot.onText(/\/start/, async (msg) => {
+    const userId = msg.from.id.toString();
+    let userData = await User.findOne({ userId });
+    if (!userData) await User.create({ userId, firstName: msg.from.first_name });
+    showMainMenu(msg.chat.id, userId, msg.from.first_name);
+});
+                                    
